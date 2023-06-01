@@ -10,6 +10,7 @@ from .serializer import *
 from .permission import *
 from django.core.paginator import Paginator, EmptyPage
 from datetime import date
+from decimal import Decimal
 
 
 #Classes
@@ -128,7 +129,37 @@ class ManagerAssignUsers(generics.ListCreateAPIView):
         
         return JsonResponse(status =201, data ={"message":"added"})
     
-#TODO: Managers can assign orders to the delivery crew, The delivery crew can access orders assigned to them, The delivery crew can update an order as delivered
+    
+#TODO: Managers can assign orders to the delivery crew, 
+class ManagerAssgintoOrder(generics.UpdateAPIView):
+    queryset = order.objects.all()
+    serializer_class = OrderSerializer
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, *args, **kwargs):
+        data= request.data
+        user =get_object_or_404( User,username = data['username'],groups = 8)
+        order.objects.filter(id = self.kwargs.get('pk')).update(delivery_crew = user.pk )
+        return Response("object changed")
+# The delivery crew can access orders assigned to them, 
+# The delivery crew can update an order as delivered
+class DeliverycrewOperations(generics.ListCreateAPIView):
+    queryset = order.objects.all()
+    serializer_class = OrderSerializer
+    permission_classes = [IsDeliveryCrew]
+
+    def get_queryset(self):
+        queryset = order.objects.filter(delivery_crew = self.request.user.id)
+        return queryset
+    
+    def post(self, request, *args, **kwargs):
+        data = request.data
+        ord = order.objects.filter(id = data['id'],delivery_crew = self.request.user.id)
+        ord.update(status = data["status"])
+        return Response("item status has been changed")
+
+
+
 
 class CustomerRegisteration(generics.ListCreateAPIView):
 
@@ -180,16 +211,60 @@ class CustomerAddItem(generics.ListCreateAPIView, generics.DestroyAPIView):
 
         return Response("item has been deleted")
         
-#TODO: Place Order get the items from the cart and use a for loop to go through each item
 class PlaceOrder(generics.ListCreateAPIView):
     queryset = order.objects.all()
     serializer_class = OrderSerializer
+    serializer_item_order_item = OrderItemSerializer
     permission_classes = [IsAuthenticated]
+    
 
     def post(self, request, *args, **kwargs):
         data = request.data
-        cart=get_object_or_404(Cart, user =self.request.user.id)
-        serializer_item = OrderSerializer(user = self.request.user.id, total = cart)
+        cart =Cart.objects.filter(user =self.request.user.id)
+        #cart=get_object_or_404(Cart, user =self.request.user.id)
+        total = 0
+        for i in cart:
+            total = total + i.price
+        data['user'] = self.request.user.id
+        data['total'] = total
+        data['date'] = date.today()
+        serializer_item = OrderSerializer( data =data)
+        serializer_item.is_valid(raise_exception=True)
+        serializer_item.save()
+        keyList = ["order","menuitem","quantity","unit_price","price"]
+        datar =dict(zip(keyList, [None]*len(keyList)))
+        for j in cart.values():
+            datar["order"] = serializer_item.data["id"]
+            datar["menuitem"] = j["menuitem_id"]
+            datar["quantity"] = j["quantity"]
+            datar["unit_price"] = j["unit_price"]
+            datar["price"] = j["price"]
+
+            serializer_item_order_item = OrderItemSerializer(data = datar)
+            serializer_item_order_item.is_valid(raise_exception= True)
+            serializer_item_order_item.save()
+        cart.delete()
+        
+        return Response(serializer_item_order_item.data)
+    
+
+
+class ViewOrderItems(generics.ListAPIView):
+    queryset = orderItem.objects.all()
+    serializer_class = OrderItemSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self, *args, **kwargs):
+        get_object_or_404(order,user = self.request.user.id, id = self.kwargs.get('pk'))
+        queryset = orderItem.objects.filter(order = self.kwargs.get('pk'))
+        return queryset
+    
+
+
+        
+
+
+
 
         
 

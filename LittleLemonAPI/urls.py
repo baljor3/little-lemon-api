@@ -10,5 +10,9 @@ urlpatterns = [
     path('Manager-change/<pk>',views.ManagerChangeitemofday.as_view()),
     path('Manager-change-group/', views.ManagerAssignUsers.as_view()),
     path('UserRegister/',views.CustomerRegisteration.as_view()),
-    path('Cart/',views.CustomerAddItem.as_view())
+    path('Cart/',views.CustomerAddItem.as_view()),
+    path('placeorder/',views.PlaceOrder.as_view()),
+    path('OrderItems/<pk>', views.ViewOrderItems.as_view()),
+    path('AssignOrder/<pk>',views.ManagerAssgintoOrder.as_view()),
+    path('Deliverycrew/', views.DeliverycrewOperations.as_view())
 ]
